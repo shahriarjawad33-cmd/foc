@@ -27,18 +27,18 @@
   </style>
 </head>
 <body>
-  <video id="vid" src="stiv.mp4" autoplay loop playsinline controls></video>
+  <video id="vid" src="stiv.mp4" preload="auto" autoplay loop playsinline controls></video>
 
   <script>
     const vid = document.getElementById("vid");
-    const SOUND_BOOST = 2.5; // প্রয়োজনে 3.0 বা 4.0 করে আরও বাড়াতে পারো
+    const SOUND_BOOST = 2.5; // প্রয়োজনে 3.0 বা 3.5 করতে পারো
 
     let audioCtx = null;
     let gainNode = null;
     let sourceConnected = false;
-    let keepUnmuted = true;
+    let userUnlockedSound = false;
 
-    function enableAudioBoost() {
+    function setupBoost() {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextClass) return;
 
@@ -62,42 +62,73 @@
       }
     }
 
-    function forceSoundOn() {
-      if (!keepUnmuted) return;
-      vid.muted = false;
-      vid.volume = 1.0;
-      enableAudioBoost();
-      if (vid.paused) {
-        vid.play().catch(() => {});
-      }
-    }
-
-    // শুরুতেই সাউন্ড অন রেখে চালানোর চেষ্টা
-    vid.muted = false;
-    vid.volume = 1.0;
-    vid.play().then(() => {
-      enableAudioBoost();
-    }).catch(() => {
-      // ব্রাউজার সাউন্ডসহ অটো-প্লে আটকালে সাময়িকভাবে মিউট করে ভিডিও চালু রাখবে
-      vid.muted = true;
-      vid.play().catch(() => {});
-    });
-
-    // ইউজার ক্লিক, টাচ বা কিবোর্ডে চাপ দিলে সাথে সাথে আনমিউট করে সাউন্ড বুস্ট করবে
-    ["pointerdown", "click", "touchstart", "keydown"].forEach((evt) => {
-      document.addEventListener(evt, () => {
-        keepUnmuted = true;
-        forceSoundOn();
-      }, { passive: true });
-    });
-
-    // মিউট হয়ে গেলে আবার অন করার চেষ্টা
-    vid.addEventListener("volumechange", () => {
-      if (keepUnmuted && vid.muted) {
+    function attemptPlay() {
+      if (userUnlockedSound) {
         vid.muted = false;
         vid.volume = 1.0;
-        enableAudioBoost();
+        setupBoost();
       }
+      return vid.play().then(() => {
+        if (userUnlockedSound) setupBoost();
+        return true;
+      }).catch(() => false);
+    }
+
+    // শুরুতেই লোডিং ও প্লে শুরু করার চেষ্টা
+    vid.load();
+    vid.muted = false;
+    vid.volume = 1.0;
+
+    attemptPlay().then((ok) => {
+      if (!ok && !userUnlockedSound) {
+        vid.muted = true;
+        vid.play().catch(() => {});
+      }
+    });
+
+    // ভিডিও ডেটা রেডি হলেই সাথে সাথে প্লে শুরু করবে
+    ["loadedmetadata", "loadeddata", "canplay"].forEach((evt) => {
+      vid.addEventListener(evt, () => {
+        if (vid.paused) {
+          attemptPlay().then((ok) => {
+            if (!ok && !userUnlockedSound) {
+              vid.muted = true;
+              vid.play().catch(() => {});
+            }
+          });
+        }
+      });
+    });
+
+    // কোনো কারণে ভিডিও পজ হয়ে গেলে দ্রুত আবার চালু করার চেষ্টা
+    setInterval(() => {
+      if (vid.paused && vid.readyState >= 2) {
+        attemptPlay().then((ok) => {
+          if (!ok && !userUnlockedSound) {
+            vid.muted = true;
+            vid.play().catch(() => {});
+          }
+        });
+      } else if (!userUnlockedSound && vid.muted) {
+        vid.muted = false;
+        vid.volume = 1.0;
+        vid.play().then(() => setupBoost()).catch(() => {
+          vid.muted = true;
+        });
+      }
+    }, 600);
+
+    // ক্লিক, টাচ বা কিবোর্ড চাপলে সাউন্ড অন + বুস্ট + প্লে নিশ্চিত করবে
+    ["pointerdown", "click", "touchstart", "keydown"].forEach((evt) => {
+      document.addEventListener(evt, () => {
+        userUnlockedSound = true;
+        vid.muted = false;
+        vid.volume = 1.0;
+        setupBoost();
+        if (vid.paused) {
+          vid.play().catch(() => {});
+        }
+      }, { passive: true });
     });
   </script>
 </body>
