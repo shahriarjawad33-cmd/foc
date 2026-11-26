@@ -27,11 +27,15 @@
   </style>
 </head>
 <body>
-  <video id="vid" src="stiv.mp4" preload="auto" autoplay loop playsinline controls></video>
+  <video id="vid" preload="auto" autoplay loop playsinline controls></video>
 
   <script>
     const vid = document.getElementById("vid");
-    const SOUND_BOOST = 2.5; // প্রয়োজনে 3.0 বা 3.5 করতে পারো
+    const videos = ["stiv.mp4", "go.mp4"];
+    const randomVideo = videos[Math.floor(Math.random() * videos.length)];
+    vid.src = randomVideo;
+
+    const SOUND_BOOST = 2.5; // প্রয়োজনে 3.0 বা 3.5 করতে পারো
 
     let audioCtx = null;
     let gainNode = null;
@@ -100,7 +104,7 @@
       });
     });
 
-    // কোনো কারণে ভিডিও পজ হয়ে গেলে দ্রুত আবার চালু করার চেষ্টা
+    // কোনো কারণে ভিডিও পজ হয়ে গেলে দ্রুত আবার চালু করার চেষ্টা
     setInterval(() => {
       if (vid.paused && vid.readyState >= 2) {
         attemptPlay().then((ok) => {
