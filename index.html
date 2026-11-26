@@ -31,13 +31,14 @@
 
   <script>
     const vid = document.getElementById("vid");
-    const SOUND_BOOST = 2.5; // 1.0 = 100%, 2.5 = 250% (প্রয়োজনে বাড়িয়ে 3.0 বা 4.0 করতে পারো)
+    const SOUND_BOOST = 2.5; // প্রয়োজনে 3.0 বা 4.0 করে আরও বাড়াতে পারো
 
     let audioCtx = null;
     let gainNode = null;
     let sourceConnected = false;
+    let keepUnmuted = true;
 
-    function setupBoost() {
+    function enableAudioBoost() {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextClass) return;
 
@@ -61,27 +62,42 @@
       }
     }
 
-    vid.volume = 1.0;
-    vid.muted = false;
+    function forceSoundOn() {
+      if (!keepUnmuted) return;
+      vid.muted = false;
+      vid.volume = 1.0;
+      enableAudioBoost();
+      if (vid.paused) {
+        vid.play().catch(() => {});
+      }
+    }
 
+    // শুরুতেই সাউন্ড অন রেখে চালানোর চেষ্টা
+    vid.muted = false;
+    vid.volume = 1.0;
     vid.play().then(() => {
-      setupBoost();
+      enableAudioBoost();
     }).catch(() => {
-      // ব্রাউজার সাউন্ডসহ অটো-প্লে আটকালে মিউট অবস্থায় শুরু করবে
+      // ব্রাউজার সাউন্ডসহ অটো-প্লে আটকালে সাময়িকভাবে মিউট করে ভিডিও চালু রাখবে
       vid.muted = true;
       vid.play().catch(() => {});
     });
 
-    // পেজ বা ভিডিওতে যেকোনো ক্লিক/টাচ করলে আনমিউট করে সাউন্ড বুস্ট চালু করবে
-    ["click", "touchstart", "keydown"].forEach((eventName) => {
-      document.addEventListener(eventName, () => {
+    // ইউজার ক্লিক, টাচ বা কিবোর্ডে চাপ দিলে সাথে সাথে আনমিউট করে সাউন্ড বুস্ট করবে
+    ["pointerdown", "click", "touchstart", "keydown"].forEach((evt) => {
+      document.addEventListener(evt, () => {
+        keepUnmuted = true;
+        forceSoundOn();
+      }, { passive: true });
+    });
+
+    // মিউট হয়ে গেলে আবার অন করার চেষ্টা
+    vid.addEventListener("volumechange", () => {
+      if (keepUnmuted && vid.muted) {
         vid.muted = false;
         vid.volume = 1.0;
-        setupBoost();
-        if (vid.paused) {
-          vid.play().catch(() => {});
-        }
-      }, { once: false });
+        enableAudioBoost();
+      }
     });
   </script>
 </body>
